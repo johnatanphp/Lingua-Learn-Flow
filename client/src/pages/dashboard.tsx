@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Layout } from "@/components/layout";
 import { useProgress, useLevels, useAchievements } from "@/hooks/use-learning";
-import { Trophy, Star, Target, Flame, ArrowRight, BookOpen } from "lucide-react";
+import { Trophy, Star, Target, Flame, ArrowRight, BookOpen, CalendarDays, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { GamifiedButton } from "@/components/gamified-button";
 
