@@ -1,0 +1,8 @@
+{
+  "name": "Speak Fluently",
+  "description": "An intelligent language learning platform with AI-powered activities, gamification, and live class integration.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

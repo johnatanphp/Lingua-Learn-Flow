@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400;1,500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Gramamond", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-200: #ddd6fe;
+  --color-brand-300: #c4b5fd;
+  --color-brand-400: #a78bfa;
+  --color-brand-500: #8b5cf6;
+  --color-brand-600: #7c3aed;
+  --color-brand-700: #6d28d9;
+  --color-brand-800: #5b21b6;
+  --color-brand-900: #4c1d95;
+  --color-brand-950: #2e1065;
+
+  /* Neon Palette */
+  --color-kiwi-neon: #99ff00;
+  --color-vino-neon: #ff0055;
+  --color-uva-neon: #9d00ff;
+  --color-cyan-neon: #00ffff;
+  --color-gold-neon: #ffd700;
+}
+
+@layer base {
+  body {
+    @apply font-sans selection:bg-brand-500/30 transition-colors duration-300 antialiased;
+    @apply bg-white text-black dark:bg-black dark:text-white;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans font-black tracking-tight;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 dark:bg-slate-800 rounded-full hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors;
+  }
+}
+
+.font-cursive {
+  @apply font-serif italic;
+}
+
+/* Glassmorphism utilities */
+.glass {
+  @apply bg-white/90 dark:bg-black/90 backdrop-blur-2xl border border-black/10 dark:border-white/20 shadow-xl;
+}
+
+.glass-card {
+  @apply bg-white dark:bg-black rounded-[2.5rem] border border-slate-100 dark:border-white/10 shadow-2xl transition-all duration-300;
+}
+
+/* Neon Borders */
+.border-cyan-neon {
+  @apply border-2 border-cyan-neon shadow-[0_0_15px_rgba(0,255,255,0.5)];
+}
+
+.border-gold-neon {
+  @apply border-2 border-gold-neon shadow-[0_0_15px_rgba(255,215,0,0.5)];
+}
+
+.border-kiwi-neon {
+  @apply border-2 border-kiwi-neon shadow-[0_0_15px_rgba(153,255,0,0.5)];
+}
+
+.border-vino-neon {
+  @apply border-2 border-vino-neon shadow-[0_0_15px_rgba(255,0,85,0.5)];
+}
+
+.border-uva-neon {
+  @apply border-2 border-uva-neon shadow-[0_0_15px_rgba(157,0,255,0.5)];
+}
+
+.glass-card:hover {
+  @apply shadow-brand-500/10 border-brand-500/20 -translate-y-1;
+}
+
+.btn-primary {
+  @apply bg-brand-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-700 transition-all shadow-xl shadow-brand-500/30 active:scale-95 disabled:opacity-50;
+}
+
+.btn-neon-kiwi {
+  @apply bg-kiwi-neon text-black px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-[0_0_20px_rgba(153,255,0,0.4)] active:scale-95;
+}
+
+.btn-neon-vino {
+  @apply bg-vino-neon text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,0,85,0.4)] active:scale-95;
+}
+
+.btn-neon-uva {
+  @apply bg-uva-neon text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-[0_0_20px_rgba(157,0,255,0.4)] active:scale-95;
+}
+
+.btn-secondary {
+  @apply bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-white/20 transition-all active:scale-95;
+}
+
+.input-field {
+  @apply w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 focus:ring-2 focus:ring-brand-500 outline-none transition-all font-sans text-sm dark:text-white;
+}
+
+.sidebar-item-active {
+  @apply bg-brand-600 text-white shadow-xl shadow-brand-500/30;
+}
+
+.sidebar-item-inactive {
+  @apply text-slate-500 dark:text-white/60 hover:bg-slate-50 dark:hover:bg-white/10;
+}
+
+/* Custom animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
