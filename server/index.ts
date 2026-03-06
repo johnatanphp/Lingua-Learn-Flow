@@ -24,7 +24,9 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 // Setup Replit Auth
-await setupAuth(app);
+(async () => {
+  await setupAuth(app);
+})();
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
