@@ -1,8 +1,8 @@
 import { pgTable, text, serial, integer, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { users } from "./models/auth";
-export { users };
+import { users, sessions } from "./models/auth";
+export { users, sessions };
 
 export const levels = pgTable("levels", {
   id: serial("id").primaryKey(),
