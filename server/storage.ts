@@ -19,6 +19,8 @@ import {
   type SubscriptionPlan,
   type UserSubscription,
 } from "@shared/schema";
+import { users, type User } from "@shared/models/auth";
+import { authStorage } from "./replit_integrations/auth/storage";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
@@ -158,6 +160,77 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userSubscriptions.wompiReference, reference))
       .returning();
     return sub;
+  }
+
+  async getAdminStats(): Promise<{ totalUsers: number; totalClasses: number; activeSubscriptions: number; totalLevels: number }> {
+    const [usersResult, classesResult, subsResult, levelsResult] = await Promise.all([
+      db.select().from(users),
+      db.select().from(liveClasses),
+      db.select().from(userSubscriptions).where(eq(userSubscriptions.status, "approved")),
+      db.select().from(levels),
+    ]);
+    return {
+      totalUsers: usersResult.length,
+      totalClasses: classesResult.length,
+      activeSubscriptions: subsResult.length,
+      totalLevels: levelsResult.length,
+    };
+  }
+
+  async getAdminUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.createdAt);
+  }
+
+  async getAdminClasses(): Promise<Array<{
+    id: number; title: string; description: string; scheduledAt: Date;
+    level: string; maxStudents: number; durationMinutes: number;
+    meetingUrl: string | null; instructorName: string; registrationCount: number;
+  }>> {
+    const classes = await db.select().from(liveClasses).orderBy(liveClasses.scheduledAt);
+    const result = await Promise.all(classes.map(async (cls) => {
+      const instructor = await authStorage.getUser(cls.instructorId);
+      const regs = await db.select().from(classRegistrations).where(eq(classRegistrations.classId, cls.id));
+      return {
+        id: cls.id,
+        title: cls.title,
+        description: cls.description,
+        scheduledAt: cls.scheduledAt,
+        level: cls.level,
+        maxStudents: cls.maxStudents,
+        durationMinutes: cls.durationMinutes,
+        meetingUrl: cls.meetingUrl ?? null,
+        instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() || instructor.email || "Admin" : "Admin",
+        registrationCount: regs.length,
+      };
+    }));
+    return result;
+  }
+
+  async createLiveClass(data: {
+    title: string; description: string; scheduledAt: Date | string;
+    instructorId: string; level: string; maxStudents: number;
+    durationMinutes: number; meetingUrl?: string;
+  }): Promise<LiveClass> {
+    const [cls] = await db.insert(liveClasses).values({
+      title: data.title,
+      description: data.description,
+      scheduledAt: new Date(data.scheduledAt),
+      instructorId: data.instructorId,
+      level: data.level,
+      maxStudents: data.maxStudents,
+      durationMinutes: data.durationMinutes,
+      meetingUrl: data.meetingUrl || null,
+    }).returning();
+    return cls;
+  }
+
+  async deleteLiveClass(id: number): Promise<void> {
+    await db.delete(classRegistrations).where(eq(classRegistrations.classId, id));
+    await db.delete(liveClasses).where(eq(liveClasses.id, id));
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<User> {
+    return await authStorage.updateUserRole(userId, role);
   }
 
   async seedSubscriptionPlans(): Promise<void> {

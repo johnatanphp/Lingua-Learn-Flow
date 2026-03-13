@@ -1,21 +1,43 @@
 import { Layout } from "@/components/layout";
 import { useLiveClasses, useRegisterClass } from "@/hooks/use-classes";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar, Video, Clock, Users, CheckCircle } from "lucide-react";
+import { Calendar, Video, Clock, Users, CheckCircle, Link as LinkIcon, GraduationCap } from "lucide-react";
 import { GamifiedButton } from "@/components/gamified-button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import type { LiveClass } from "@shared/schema";
 
 const CLASS_IMAGES = [
   "https://images.unsplash.com/photo-1573164713988-8665fc963095?w=600&h=300&fit=crop",
   "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600&h=300&fit=crop",
   "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=600&h=300&fit=crop",
+  "https://images.unsplash.com/photo-1610484826967-09c5720778c7?w=600&h=300&fit=crop",
+  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=300&fit=crop",
 ];
 
+const LEVEL_COLORS: Record<string, string> = {
+  principiante: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  básico: "bg-blue-100 text-blue-700 border-blue-200",
+  intermedio: "bg-orange-100 text-orange-700 border-orange-200",
+  avanzado: "bg-red-100 text-red-700 border-red-200",
+  todos: "bg-violet-100 text-violet-700 border-violet-200",
+};
+
+interface ClassWithDetails extends LiveClass {
+  instructorName?: string;
+  registrationCount?: number;
+}
+
+interface ClassesResponse {
+  classes: ClassWithDetails[];
+}
+
 export default function LiveClasses() {
-  const { data: classes, isLoading } = useLiveClasses();
+  const { data: classes, isLoading } = useLiveClasses() as { data: ClassWithDetails[] | undefined; isLoading: boolean };
   const { mutate: register, isPending, variables: registeredId } = useRegisterClass();
   const { toast } = useToast();
   const [registered, setRegistered] = useState<Set<number>>(new Set());
@@ -48,7 +70,7 @@ export default function LiveClasses() {
           Clases en Vivo
         </h1>
         <p className="text-muted-foreground">
-          Practica con instructores expertos en tiempo real y mejora tu fluidez.
+          Practica con instructores expertos en tiempo real y mejora tu fluidez en Speak Fluently.
         </p>
       </header>
 
@@ -56,7 +78,7 @@ export default function LiveClasses() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-72 bg-muted animate-pulse rounded-3xl" />
+            <div key={i} className="h-80 bg-muted animate-pulse rounded-3xl" />
           ))}
         </div>
       ) : classes && classes.length > 0 ? (
@@ -65,6 +87,8 @@ export default function LiveClasses() {
             const isRegistered = registered.has(cls.id);
             const isThisLoading = isPending && registeredId === cls.id;
             const imgSrc = CLASS_IMAGES[idx % CLASS_IMAGES.length];
+            const spotsLeft = (cls.maxStudents ?? 20) - (cls.registrationCount ?? 0);
+            const levelColor = LEVEL_COLORS[cls.level ?? "todos"] ?? LEVEL_COLORS.todos;
 
             return (
               <motion.div
@@ -83,46 +107,73 @@ export default function LiveClasses() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                   <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                     EN VIVO
                   </div>
+                  <div className="absolute top-3 right-3">
+                    <Badge className={`text-[10px] border font-semibold capitalize ${levelColor}`}>
+                      {cls.level ?? "Todos"}
+                    </Badge>
+                  </div>
                   <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-full">
                     <Users className="w-3 h-3" />
-                    <span>12 plazas</span>
+                    <span>{spotsLeft > 0 ? `${spotsLeft} plazas` : "Completo"}</span>
                   </div>
                 </div>
 
                 {/* Content */}
                 <div className="p-5 flex flex-col flex-1">
                   <h3 className="text-lg font-display font-bold mb-1.5 leading-tight">{cls.title}</h3>
-                  <p className="text-muted-foreground text-sm line-clamp-2 mb-4 flex-1">{cls.description}</p>
+                  <p className="text-muted-foreground text-sm line-clamp-2 mb-3 flex-1">{cls.description}</p>
 
-                  <div className="space-y-2 mb-5">
+                  {/* Instructor */}
+                  {cls.instructorName && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                      <GraduationCap className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="font-medium">{cls.instructorName}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5 mb-4">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Calendar className="w-4 h-4 text-primary flex-shrink-0" />
                       <span>{format(new Date(cls.scheduledAt), "d 'de' MMMM, yyyy", { locale: es })}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Clock className="w-4 h-4 text-secondary flex-shrink-0" />
-                      <span>{format(new Date(cls.scheduledAt), "HH:mm")} hrs · 45 min</span>
+                      <span>{format(new Date(cls.scheduledAt), "HH:mm")} hrs · {cls.durationMinutes ?? 45} min</span>
                     </div>
                   </div>
 
                   {isRegistered ? (
-                    <div className="flex items-center justify-center gap-2 bg-success/10 text-success border-2 border-success/30 rounded-2xl py-3 font-bold text-sm">
-                      <CheckCircle className="w-4 h-4" />
-                      ¡Inscrito!
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 rounded-2xl py-3 font-bold text-sm">
+                        <CheckCircle className="w-4 h-4" />
+                        ¡Inscrito!
+                      </div>
+                      {cls.meetingUrl && (
+                        <a
+                          href={cls.meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-testid={`link-meeting-${cls.id}`}
+                          className="flex items-center justify-center gap-2 text-sm font-semibold text-primary hover:underline py-2 bg-primary/5 rounded-2xl border border-primary/20 transition-colors hover:bg-primary/10"
+                        >
+                          <LinkIcon className="w-4 h-4" />
+                          Unirse a la clase
+                        </a>
+                      )}
                     </div>
                   ) : (
                     <GamifiedButton
                       fullWidth
                       onClick={() => handleRegister(cls.id)}
-                      disabled={isThisLoading || isPending}
+                      disabled={isThisLoading || isPending || spotsLeft <= 0}
                       data-testid={`btn-register-${cls.id}`}
                     >
-                      {isThisLoading ? "Inscribiendo..." : "Reservar plaza"}
+                      {isThisLoading ? "Inscribiendo..." : spotsLeft <= 0 ? "Sin plazas" : "Reservar plaza"}
                     </GamifiedButton>
                   )}
                 </div>
@@ -140,7 +191,7 @@ export default function LiveClasses() {
             No hay clases disponibles
           </h3>
           <p className="text-muted-foreground text-sm max-w-xs">
-            Pronto agregaremos nuevas clases en vivo. ¡Vuelve a consultar!
+            Pronto agregaremos nuevas clases en vivo. El administrador puede crearlas desde el panel de administración.
           </p>
         </div>
       )}

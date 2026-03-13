@@ -3,8 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
-import { isAuthenticated } from "./replit_integrations/auth";
+import { isAuthenticated, requireRole } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth";
+import { authStorage } from "./replit_integrations/auth/storage";
 import { openai } from "./replit_integrations/chat/client";
 import { db } from "./db";
 import { levels, lessons, achievements } from "@shared/schema";
@@ -17,6 +18,30 @@ import {
   verifyWebhookSignature,
   WOMPI_PUBLIC_KEY,
 } from "./wompi";
+import bcrypt from "bcryptjs";
+
+// Seed default admin account
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@speakfluently.co";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "SpeakAdmin2026!";
+
+async function seedAdminAccount() {
+  try {
+    const existing = await authStorage.getUserByEmail(ADMIN_EMAIL);
+    if (!existing) {
+      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+      await authStorage.createLocalUser({
+        email: ADMIN_EMAIL,
+        passwordHash,
+        firstName: "Admin",
+        lastName: "Speak Fluently",
+        role: "admin",
+      });
+      console.log(`[admin] Cuenta admin creada: ${ADMIN_EMAIL}`);
+    }
+  } catch (e) {
+    console.error("[admin] Error al crear cuenta admin:", e);
+  }
+}
 
 // Seed function to initialize the database with basic gamified content
 async function seedDatabase() {
@@ -166,6 +191,68 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Admin Routes ─────────────────────────────────────────────
+  app.get("/api/admin/stats", isAuthenticated, requireRole("admin"), async (_req, res) => {
+    const stats = await storage.getAdminStats();
+    res.json(stats);
+  });
+
+  app.get("/api/admin/users", isAuthenticated, requireRole("admin"), async (_req, res) => {
+    const adminUsers = await storage.getAdminUsers();
+    const safe = adminUsers.map(({ passwordHash: _, ...u }: any) => u);
+    res.json({ users: safe });
+  });
+
+  app.patch("/api/admin/users/:userId/role", isAuthenticated, requireRole("admin"), async (req, res) => {
+    const { userId } = req.params;
+    const { role } = z.object({ role: z.enum(["student", "teacher", "admin", "guest"]) }).parse(req.body);
+    const updated = await storage.updateUserRole(userId, role);
+    const { passwordHash: _, ...safe } = updated as any;
+    res.json(safe);
+  });
+
+  app.get("/api/admin/classes", isAuthenticated, requireRole("admin"), async (_req, res) => {
+    const classes = await storage.getAdminClasses();
+    res.json({ classes });
+  });
+
+  app.post("/api/admin/classes", isAuthenticated, requireRole("admin"), async (req: any, res) => {
+    const schema = z.object({
+      title: z.string().min(1),
+      description: z.string().min(1),
+      scheduledAt: z.string(),
+      level: z.string().default("todos"),
+      maxStudents: z.number().int().min(1).default(20),
+      durationMinutes: z.number().int().min(15).default(45),
+      meetingUrl: z.string().url().optional().or(z.literal("")),
+    });
+    const data = schema.parse(req.body);
+    const instructorId = req.user.claims.sub;
+    const cls = await storage.createLiveClass({ ...data, instructorId, meetingUrl: data.meetingUrl || undefined });
+    res.status(201).json(cls);
+  });
+
+  app.delete("/api/admin/classes/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    const id = Number(req.params.id);
+    await storage.deleteLiveClass(id);
+    res.json({ success: true });
+  });
+
+  app.get("/api/admin/api-status", isAuthenticated, requireRole("admin"), (_req, res) => {
+    res.json({
+      database: true,
+      openai: !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY),
+      wompi: !!(process.env.WOMPI_PUBLIC_KEY && process.env.WOMPI_PRIVATE_KEY),
+      googleOAuth: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    });
+  });
+
+  // ─── Live Classes (public - enrich with instructor info) ────────
+  app.get("/api/live-classes/enriched", async (_req, res) => {
+    const classes = await storage.getAdminClasses();
+    res.json(classes);
+  });
+
   // ─── Subscription Plans ──────────────────────────────────────
   app.get("/api/plans", async (_req, res) => {
     const plans = await storage.getSubscriptionPlans();
@@ -250,9 +337,10 @@ export async function registerRoutes(
     }
   });
 
-  // Call seed database
+  // Call seed database and admin account
   seedDatabase().catch(console.error);
   storage.seedSubscriptionPlans().catch(console.error);
+  seedAdminAccount().catch(console.error);
 
   return httpServer;
 }
