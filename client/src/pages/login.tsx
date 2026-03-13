@@ -105,7 +105,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-500 shadow-lg mb-3">
             <BookOpen className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">LinguaLearn</h1>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Speak Fluently</h1>
           <p className="text-gray-500 text-sm mt-1">Aprende idiomas · Crece cada día</p>
         </div>
 
@@ -341,7 +341,7 @@ export default function Login() {
         </Card>
 
         <p className="text-center text-xs text-gray-400">
-          Al usar LinguaLearn aceptas nuestros{" "}
+          Al usar Speak Fluently aceptas nuestros{" "}
           <span className="underline cursor-pointer">Términos</span> y{" "}
           <span className="underline cursor-pointer">Privacidad</span>
         </p>

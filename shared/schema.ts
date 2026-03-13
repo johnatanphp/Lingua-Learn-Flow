@@ -59,6 +59,9 @@ export const liveClasses = pgTable("live_classes", {
   scheduledAt: timestamp("scheduled_at").notNull(),
   instructorId: varchar("instructor_id").notNull().references(() => users.id),
   meetingUrl: text("meeting_url"),
+  maxStudents: integer("max_students").notNull().default(20),
+  durationMinutes: integer("duration_minutes").notNull().default(45),
+  level: varchar("level", { length: 30 }).notNull().default("todos"),
 });
 
 export const classRegistrations = pgTable("class_registrations", {

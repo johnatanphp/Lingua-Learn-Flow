@@ -56,14 +56,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <BookOpen className="w-6 h-6" />
             </div>
             <span className="text-xl font-display font-black text-foreground tracking-tight">
-              Lingua<span className="text-primary">Learn</span>
+              Speak<span className="text-primary"> Fluently</span>
             </span>
           </Link>
         </div>
 
         {/* Nav Links */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {[
+            ...NAV_ITEMS,
+            ...(user?.role === "admin"
+              ? [{ href: "/admin", label: "Panel Admin", icon: Shield }]
+              : []),
+          ].map((item) => {
             const active = item.href === "/"
               ? location === "/"
               : location.startsWith(item.href);
@@ -75,6 +80,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold text-sm transition-all duration-200 ${
                   active
                     ? "bg-primary text-primary-foreground shadow-sm"
+                    : item.href === "/admin"
+                    ? "text-purple-600 hover:bg-purple-50"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
@@ -134,7 +141,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="bg-gradient-to-br from-primary to-secondary p-1.5 rounded-lg text-white">
               <BookOpen className="w-4 h-4" />
             </div>
-            <span className="font-display font-black text-lg">LinguaLearn</span>
+            <span className="font-display font-black text-lg">Speak Fluently</span>
           </div>
 
           <div className="hidden md:block" />
@@ -177,7 +184,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* ── Mobile Bottom Nav ────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border z-50" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex items-center justify-around px-1 py-1">
-          {NAV_ITEMS.map((item) => {
+          {[
+            ...NAV_ITEMS,
+            ...(user?.role === "admin"
+              ? [{ href: "/admin", label: "Admin", icon: Shield }]
+              : []),
+          ].map((item) => {
             const active = item.href === "/"
               ? location === "/"
               : location.startsWith(item.href);
