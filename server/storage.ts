@@ -47,6 +47,14 @@ export interface IStorage {
   createPendingSubscription(userId: string, planId: number, reference: string): Promise<UserSubscription>;
   updateSubscriptionStatus(reference: string, status: string, transactionId?: string): Promise<UserSubscription | undefined>;
   seedSubscriptionPlans(): Promise<void>;
+
+  // Admin
+  getAdminStats(): Promise<{ totalUsers: number; totalClasses: number; activeSubscriptions: number; totalLevels: number }>;
+  getAdminUsers(): Promise<User[]>;
+  getAdminClasses(): Promise<Array<{ id: number; title: string; description: string; scheduledAt: Date; level: string; maxStudents: number; durationMinutes: number; meetingUrl: string | null; instructorName: string; registrationCount: number; }>>;
+  createLiveClass(data: { title: string; description: string; scheduledAt: Date | string; instructorId: string; level: string; maxStudents: number; durationMinutes: number; meetingUrl?: string; }): Promise<LiveClass>;
+  deleteLiveClass(id: number): Promise<void>;
+  updateUserRole(userId: string, role: string): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
