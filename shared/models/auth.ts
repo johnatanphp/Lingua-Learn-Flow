@@ -21,8 +21,9 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  passwordHash: varchar("password_hash"),
   role: varchar("role", { length: 20 }).notNull().default("student"),
-  authProvider: varchar("auth_provider", { length: 30 }).notNull().default("replit"),
+  authProvider: varchar("auth_provider", { length: 30 }).notNull().default("local"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

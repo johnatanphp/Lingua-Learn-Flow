@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { isAuthenticated } from "./replit_integrations/auth";
-import { openai } from "./replit_integrations/chat/client"; // We will use OpenAI from our AI integrations
+import { registerAuthRoutes } from "./replit_integrations/auth";
+import { openai } from "./replit_integrations/chat/client";
 import { db } from "./db";
 import { levels, lessons, achievements } from "@shared/schema";
 
@@ -60,7 +61,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
+  // Register auth routes (register, login, logout, role update)
+  registerAuthRoutes(app);
+
   // Levels & Lessons
   app.get(api.levels.list.path, async (req, res) => {
     const levels = await storage.getLevels();

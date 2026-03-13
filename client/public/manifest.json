@@ -1,0 +1,39 @@
+{
+  "name": "LinguaLearn",
+  "short_name": "LinguaLearn",
+  "description": "Aprende idiomas de forma divertida y efectiva",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Continuar aprendiendo",
+      "url": "/path",
+      "description": "Ir al camino de aprendizaje"
+    },
+    {
+      "name": "Práctica con IA",
+      "url": "/ai-practice",
+      "description": "Practicar conversación con IA"
+    }
+  ]
+}

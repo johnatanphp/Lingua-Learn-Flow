@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  createLocalUser(data: { email: string; passwordHash: string; firstName: string; lastName?: string; role?: string }): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User>;
 }
@@ -17,6 +18,27 @@ class AuthStorage implements IAuthStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createLocalUser(data: {
+    email: string;
+    passwordHash: string;
+    firstName: string;
+    lastName?: string;
+    role?: string;
+  }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: data.email,
+        passwordHash: data.passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName ?? null,
+        role: data.role ?? "student",
+        authProvider: "local",
+      })
+      .returning();
     return user;
   }
 
