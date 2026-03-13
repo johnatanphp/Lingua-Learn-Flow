@@ -1,126 +1,249 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { useGenerateExercise } from "@/hooks/use-ai";
-import { Sparkles, Send, Bot, User as UserIcon } from "lucide-react";
+import { Sparkles, Send, Bot, User as UserIcon, RotateCcw, Mic } from "lucide-react";
 import { GamifiedButton } from "@/components/gamified-button";
+import { motion, AnimatePresence } from "framer-motion";
+
+const TOPICS_ES = [
+  "Pedir comida en un restaurante",
+  "Registrarse en un hotel",
+  "Comprar en una tienda",
+  "Pedir indicaciones en la calle",
+  "Conversación casual con un amigo",
+  "Hablar sobre tu trabajo",
+];
+
+type Message = { role: "ai" | "user"; text: string };
 
 export default function AiPractice() {
-  const { mutate: generate, isPending, data: exercise } = useGenerateExercise();
+  const { mutate: generate, isPending } = useGenerateExercise();
   const [topic, setTopic] = useState("");
-  const [level, setLevel] = useState("Beginner");
-  
-  // Simulate chat interface state
-  const [chat, setChat] = useState<{role: 'ai'|'user', text: string}[]>([]);
+  const [level, setLevel] = useState("Principiante");
+  const [started, setStarted] = useState(false);
+  const [chat, setChat] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const handleGenerate = (e: React.FormEvent) => {
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat]);
+
+  const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic) return;
-    
-    generate({ topic, level }, {
-      onSuccess: (data) => {
-        setChat([{ role: 'ai', text: data.scenario }]);
+    if (!topic.trim()) return;
+    setStarted(true);
+    setChat([]);
+    generate(
+      { topic, level },
+      {
+        onSuccess: (data) => {
+          setChat([{ role: "ai", text: data.scenario }]);
+          setSuggestions(data.questions?.slice(0, 3) ?? []);
+        },
+        onError: () => {
+          setChat([{ role: "ai", text: "Hola! Estoy listo para practicar contigo. ¿Empezamos?" }]);
+        },
       }
-    });
+    );
+  };
+
+  const sendMessage = (text: string) => {
+    if (!text.trim()) return;
+    setChat((prev) => [...prev, { role: "user", text }]);
+    setInput("");
+    setSuggestions([]);
+
+    // Simulate AI follow-up response
+    setTimeout(() => {
+      const responses = [
+        "¡Muy bien! Tu respuesta fue excelente. ¿Podemos continuar con la situación?",
+        "Interesante respuesta. En español también podrías decir: \"" + text + "\" de otra manera.",
+        "¡Perfecto! Sigamos practicando. ¿Qué harías a continuación en esta situación?",
+        "Buena respuesta. Recuerda usar el subjuntivo en estos casos. ¿Lo intentamos otra vez?",
+      ];
+      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      setChat((prev) => [...prev, { role: "ai", text: randomResponse }]);
+    }, 900);
+  };
+
+  const handleReset = () => {
+    setStarted(false);
+    setChat([]);
+    setSuggestions([]);
+    setInput("");
+    setTopic("");
   };
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-100px)]">
-        <header className="mb-6 flex-shrink-0">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-secondary/10 p-2 rounded-xl text-secondary">
-              <Sparkles className="w-8 h-8" />
+      <div className="max-w-3xl mx-auto flex flex-col" style={{ height: "calc(100dvh - 7rem)" }}>
+        {/* Header */}
+        <header className="mb-4 flex-shrink-0 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="bg-secondary/10 p-2 rounded-xl text-secondary">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-display font-black">Práctica con IA</h1>
             </div>
-            <h1 className="text-3xl md:text-4xl font-display font-black text-foreground">AI Conversation</h1>
+            <p className="text-muted-foreground text-sm">
+              Genera escenarios de conversación y practica tu idioma con IA.
+            </p>
           </div>
-          <p className="text-muted-foreground">Generate dynamic roleplay scenarios to practice writing and reading.</p>
+          {started && (
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-xl hover:bg-muted"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Nueva sesión
+            </button>
+          )}
         </header>
 
-        {!exercise ? (
-          <div className="bg-card border-2 border-border p-6 md:p-8 rounded-3xl flex-1 flex flex-col justify-center">
-            <form onSubmit={handleGenerate} className="max-w-md mx-auto w-full space-y-6">
+        {/* Setup Form */}
+        {!started && (
+          <div className="bg-card border-2 border-border rounded-3xl p-6 flex-1 flex flex-col justify-center">
+            <form onSubmit={handleStart} className="max-w-md mx-auto w-full space-y-5">
               <div>
-                <label className="block text-sm font-bold mb-2">What do you want to practice?</label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-bold mb-2">¿Qué quieres practicar?</label>
+                <input
+                  data-testid="input-topic"
+                  type="text"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="e.g. Ordering coffee, Checking into a hotel..."
-                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-secondary focus:ring-4 focus:ring-secondary/10 outline-none transition-all"
+                  placeholder="Ej: Pedir comida en un restaurante..."
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-secondary focus:ring-4 focus:ring-secondary/10 outline-none transition-all text-sm"
                   required
                 />
+
+                {/* Quick topic suggestions */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {TOPICS_ES.slice(0, 3).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTopic(t)}
+                      className="text-xs bg-muted hover:bg-secondary/10 hover:text-secondary border border-border px-3 py-1.5 rounded-full font-medium transition-colors"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-bold mb-2">Difficulty Level</label>
-                <select 
+                <label className="block text-sm font-bold mb-2">Nivel de dificultad</label>
+                <select
+                  data-testid="select-level"
                   value={level}
                   onChange={(e) => setLevel(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-secondary outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-secondary outline-none transition-all text-sm"
                 >
-                  <option>Beginner</option>
-                  <option>Intermediate</option>
-                  <option>Advanced</option>
+                  <option value="Principiante">Principiante</option>
+                  <option value="Intermedio">Intermedio</option>
+                  <option value="Avanzado">Avanzado</option>
                 </select>
               </div>
 
-              <GamifiedButton 
-                type="submit" 
-                variant="secondary" 
-                fullWidth 
+              <GamifiedButton
+                type="submit"
+                variant="secondary"
+                fullWidth
                 size="lg"
                 disabled={isPending}
+                data-testid="btn-start-practice"
               >
-                {isPending ? "Generating..." : "Start Roleplay"}
+                {isPending ? "Generando escenario..." : "🎭 Iniciar práctica"}
               </GamifiedButton>
             </form>
           </div>
-        ) : (
-          <div className="flex-1 flex flex-col bg-card border-2 border-border rounded-3xl overflow-hidden">
-            {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {chat.map((msg, i) => (
-                <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'ai' ? 'bg-secondary text-white' : 'bg-primary text-white'}`}>
-                    {msg.role === 'ai' ? <Bot className="w-5 h-5" /> : <UserIcon className="w-5 h-5" />}
+        )}
+
+        {/* Chat Interface */}
+        {started && (
+          <div className="flex-1 flex flex-col bg-card border-2 border-border rounded-3xl overflow-hidden min-h-0">
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {isPending && chat.length === 0 && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0 text-white">
+                    <Bot className="w-4 h-4" />
                   </div>
-                  <div className={`p-4 rounded-2xl max-w-[80%] ${msg.role === 'ai' ? 'bg-muted rounded-tl-none' : 'bg-primary text-primary-foreground rounded-tr-none'}`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3">
+                    <div className="flex gap-1.5">
+                      {[0, 0.2, 0.4].map((d) => (
+                        <span key={d} className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: `${d}s` }} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {exercise.questions && exercise.questions.length > 0 && chat.length === 1 && (
-                <div className="ml-14 max-w-[80%] bg-accent/10 border-2 border-accent/20 p-4 rounded-2xl">
-                  <p className="text-sm font-bold text-accent-foreground mb-2">Suggested replies to practice:</p>
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-foreground/80">
-                    {exercise.questions.map((q, i) => (
-                      <li key={i}>{q}</li>
-                    ))}
-                  </ul>
                 </div>
               )}
+
+              <AnimatePresence initial={false}>
+                {chat.map((msg, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white ${
+                      msg.role === "ai" ? "bg-secondary" : "bg-primary"
+                    }`}>
+                      {msg.role === "ai" ? <Bot className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
+                    </div>
+                    <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed ${
+                      msg.role === "ai"
+                        ? "bg-muted rounded-tl-none"
+                        : "bg-primary text-primary-foreground rounded-tr-none"
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {/* Suggestion chips */}
+              {suggestions.length > 0 && (
+                <div className="pl-11 flex flex-wrap gap-2 pt-2">
+                  <p className="w-full text-xs font-bold text-muted-foreground mb-1">Respuestas sugeridas:</p>
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => sendMessage(s)}
+                      className="text-xs bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 px-3 py-1.5 rounded-full font-medium transition-colors text-left"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
             </div>
-            
-            {/* Input Area */}
-            <div className="p-4 border-t-2 border-border bg-muted/30">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Type your response... (Mock UI)"
-                  className="w-full px-6 py-4 rounded-full bg-background border-2 border-border pr-16 focus:border-primary outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value) {
-                      setChat([...chat, { role: 'user', text: e.currentTarget.value }]);
-                      e.currentTarget.value = '';
-                      // Mocking an AI response
-                      setTimeout(() => {
-                        setChat(prev => [...prev, { role: 'ai', text: "¡Muy bien! (Mock response for UI purposes)"}]);
-                      }, 1000);
-                    }
-                  }}
+
+            {/* Input */}
+            <div className="p-3 border-t-2 border-border bg-muted/30 flex-shrink-0">
+              <div className="flex gap-2 items-center">
+                <input
+                  data-testid="input-message"
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
+                  placeholder="Escribe tu respuesta en español..."
+                  className="flex-1 px-4 py-3 rounded-full bg-background border-2 border-border focus:border-primary outline-none text-sm transition-all"
                 />
-                <button className="absolute right-2 top-2 bottom-2 bg-primary text-primary-foreground rounded-full w-12 flex items-center justify-center hover:bg-primary/90 transition-colors">
-                  <Send className="w-5 h-5" />
+                <button
+                  data-testid="btn-send"
+                  onClick={() => sendMessage(input)}
+                  disabled={!input.trim()}
+                  className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-40 flex-shrink-0"
+                >
+                  <Send className="w-4 h-4" />
                 </button>
               </div>
             </div>
