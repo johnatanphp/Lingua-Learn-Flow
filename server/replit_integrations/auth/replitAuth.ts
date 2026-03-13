@@ -1,23 +1,9 @@
-import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
-
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
-import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
-
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -28,37 +14,15 @@ export function getSession() {
     createTableIfMissing: true,
   });
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET ?? "lingua-learn-secret-fallback",
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
     },
-  });
-}
-
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
-  user.provider = "replit";
-}
-
-async function upsertReplitUser(claims: any) {
-  return await authStorage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-    authProvider: "replit",
   });
 }
 
@@ -68,35 +32,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
-
-  // ─── Replit OIDC Strategy ────────────────────────────────────────
-  const verify: VerifyFunction = async (tokens, verified) => {
-    const user: any = {};
-    updateUserSession(user, tokens);
-    await upsertReplitUser(tokens.claims());
-    verified(null, user);
-  };
-
-  const registeredStrategies = new Set<string>();
-  const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
-    if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
-        {
-          name: strategyName,
-          config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
-        },
-        verify
-      );
-      passport.use(strategy);
-      registeredStrategies.add(strategyName);
-    }
-  };
-
-  // ─── Google OAuth2 Strategy ──────────────────────────────────────
+  // ─── Google OAuth2 Strategy (optional) ──────────────────────────
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -123,7 +59,6 @@ export async function setupAuth(app: Express) {
             const sessionUser: any = {
               claims: { sub: dbUser.id, email: dbUser.email },
               provider: "google",
-              dbUser,
             };
             done(null, sessionUser);
           } catch (err) {
@@ -137,38 +72,24 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  // ─── Replit Login Routes ─────────────────────────────────────────
-  app.get("/api/login", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+  // ─── Redirect any legacy /api/login → our login page ────────────
+  app.get("/api/login", (_req, res) => {
+    res.redirect("/login");
   });
 
-  app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/login",
-    })(req, res, next);
-  });
+  // ─── Google OAuth routes ─────────────────────────────────────────
+  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
+    app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+    app.get(
+      "/api/auth/google/callback",
+      passport.authenticate("google", {
+        successRedirect: "/",
+        failureRedirect: "/login?error=google_failed",
+      })
+    );
+  }
 
-  // ─── Google Login Routes ─────────────────────────────────────────
-  app.get(
-    "/api/auth/google",
-    passport.authenticate("google", { scope: ["profile", "email"] })
-  );
-
-  app.get(
-    "/api/auth/google/callback",
-    passport.authenticate("google", {
-      successRedirect: "/",
-      failureRedirect: "/login?error=google_failed",
-    })
-  );
-
-  // ─── Guest Session Route ─────────────────────────────────────────
+  // ─── Guest Session ────────────────────────────────────────────────
   app.post("/api/auth/guest", async (req, res) => {
     try {
       const guestId = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -184,7 +105,6 @@ export async function setupAuth(app: Express) {
       const sessionUser: any = {
         claims: { sub: guestUser.id, email: null },
         provider: "guest",
-        dbUser: guestUser,
       };
       req.login(sessionUser, (err) => {
         if (err) return res.status(500).json({ message: "Error al crear sesión de invitado" });
@@ -198,24 +118,8 @@ export async function setupAuth(app: Express) {
 
   // ─── Logout ──────────────────────────────────────────────────────
   app.get("/api/logout", (req, res) => {
-    const provider = (req.user as any)?.provider;
     req.logout(() => {
-      if (provider === "google" || provider === "guest") {
-        res.redirect("/login");
-      } else {
-        client
-          .buildEndSessionUrl(config, {
-            client_id: process.env.REPL_ID!,
-            post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-          })
-          .href;
-        res.redirect(
-          client.buildEndSessionUrl(config, {
-            client_id: process.env.REPL_ID!,
-            post_logout_redirect_uri: `${req.protocol}://${req.hostname}/login`,
-          }).href
-        );
-      }
+      res.redirect("/login");
     });
   });
 }
