@@ -8,6 +8,15 @@ import { registerAuthRoutes } from "./replit_integrations/auth";
 import { openai } from "./replit_integrations/chat/client";
 import { db } from "./db";
 import { levels, lessons, achievements } from "@shared/schema";
+import {
+  wompiEnabled,
+  generateReference,
+  generateIntegritySignature,
+  buildCheckoutUrl,
+  getTransaction,
+  verifyWebhookSignature,
+  WOMPI_PUBLIC_KEY,
+} from "./wompi";
 
 // Seed function to initialize the database with basic gamified content
 async function seedDatabase() {
@@ -157,8 +166,93 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Subscription Plans ──────────────────────────────────────
+  app.get("/api/plans", async (_req, res) => {
+    const plans = await storage.getSubscriptionPlans();
+    res.json({ plans, wompiEnabled: wompiEnabled(), publicKey: WOMPI_PUBLIC_KEY });
+  });
+
+  app.get("/api/subscription", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const sub = await storage.getUserActiveSubscription(userId);
+    res.json({ subscription: sub ?? null });
+  });
+
+  app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { planSlug } = z.object({ planSlug: z.string() }).parse(req.body);
+
+    const plan = await storage.getSubscriptionPlanBySlug(planSlug);
+    if (!plan) return res.status(404).json({ message: "Plan no encontrado" });
+    if (plan.priceInCents === 0) return res.status(400).json({ message: "El plan gratuito no requiere pago" });
+    if (!wompiEnabled()) return res.status(503).json({ message: "Pasarela de pago no configurada" });
+
+    const userEmail = req.user?.claims?.email ?? undefined;
+    const reference = generateReference(userId, plan.slug);
+    const signature = await generateIntegritySignature(reference, plan.priceInCents, plan.currency);
+
+    const host = `${req.protocol}://${req.get("host")}`;
+    const redirectUrl = `${host}/planes?ref=${reference}`;
+
+    const checkoutUrl = buildCheckoutUrl(
+      reference,
+      plan.priceInCents,
+      plan.currency,
+      signature,
+      redirectUrl,
+      userEmail,
+    );
+
+    await storage.createPendingSubscription(userId, plan.id, reference);
+    res.json({ checkoutUrl, reference });
+  });
+
+  app.get("/api/subscription/verify/:reference", isAuthenticated, async (req: any, res) => {
+    const { reference } = req.params;
+    const sub = await storage.updateSubscriptionStatus(reference, "checking");
+    if (!sub) return res.status(404).json({ message: "Suscripción no encontrada" });
+
+    if (sub.wompiTransactionId) {
+      const tx = await getTransaction(sub.wompiTransactionId);
+      if (tx) {
+        const status = tx.status === "APPROVED" ? "approved" : tx.status.toLowerCase();
+        await storage.updateSubscriptionStatus(reference, status, tx.id);
+        return res.json({ status });
+      }
+    }
+
+    res.json({ status: sub.status });
+  });
+
+  app.post("/api/webhooks/wompi", async (req, res) => {
+    try {
+      const signature = req.headers["x-event-checksum"] as string;
+      const timestamp = req.headers["x-timestamp"] as string;
+      const rawBody = typeof req.rawBody === "string" ? req.rawBody : JSON.stringify(req.body);
+
+      if (signature && timestamp && !verifyWebhookSignature(rawBody, timestamp, signature)) {
+        return res.status(401).json({ message: "Invalid signature" });
+      }
+
+      const event = req.body;
+      if (event?.event === "transaction.updated") {
+        const tx = event?.data?.transaction;
+        if (tx?.reference && tx?.id && tx?.status) {
+          const status = tx.status === "APPROVED" ? "approved" : tx.status.toLowerCase();
+          await storage.updateSubscriptionStatus(tx.reference, status, tx.id);
+        }
+      }
+
+      res.json({ received: true });
+    } catch (err) {
+      console.error("Wompi webhook error:", err);
+      res.status(400).json({ message: "Webhook error" });
+    }
+  });
+
   // Call seed database
   seedDatabase().catch(console.error);
+  storage.seedSubscriptionPlans().catch(console.error);
 
   return httpServer;
 }

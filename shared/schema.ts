@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, varchar, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users, sessions } from "./models/auth";
@@ -68,10 +68,38 @@ export const classRegistrations = pgTable("class_registrations", {
   registeredAt: timestamp("registered_at").defaultNow(),
 });
 
+// ─── Subscription Plans ──────────────────────────────────────────
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 50 }).notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  priceInCents: integer("price_in_cents").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).notNull().default("COP"),
+  features: text("features").array().notNull().default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  planId: integer("plan_id").notNull().references(() => subscriptionPlans.id),
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  wompiTransactionId: varchar("wompi_transaction_id", { length: 100 }),
+  wompiReference: varchar("wompi_reference", { length: 100 }),
+  startedAt: timestamp("started_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Schemas
 export const insertLevelSchema = createInsertSchema(levels).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLiveClassSchema = createInsertSchema(liveClasses).omit({ id: true });
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true });
+export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({ id: true });
 
 export type Level = typeof levels.$inferSelect;
 export type InsertLevel = z.infer<typeof insertLevelSchema>;
@@ -81,3 +109,5 @@ export type LiveClass = typeof liveClasses.$inferSelect;
 export type UserProgress = typeof userProgress.$inferSelect;
 export type Achievement = typeof achievements.$inferSelect;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type UserSubscription = typeof userSubscriptions.$inferSelect;

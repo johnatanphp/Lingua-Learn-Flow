@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   BookOpen, LayoutDashboard, CalendarDays,
   Sparkles, Medal, LogOut, Zap, Flame,
-  GraduationCap, Users, Shield, Globe,
+  GraduationCap, Users, Shield, Globe, CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/classes",      label: "Clases",        icon: CalendarDays },
   { href: "/ai-practice",  label: "IA",            icon: Sparkles },
   { href: "/achievements", label: "Logros",        icon: Medal },
+  { href: "/planes",       label: "Planes",        icon: CreditCard },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
