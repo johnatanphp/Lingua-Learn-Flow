@@ -14,6 +14,8 @@ const AiPractice   = lazy(() => import("@/pages/ai-practice"));
 const Achievements = lazy(() => import("@/pages/achievements"));
 const Pricing      = lazy(() => import("@/pages/pricing"));
 const Admin        = lazy(() => import("@/pages/admin"));
+const Resources    = lazy(() => import("@/pages/resources"));
+const Receipt      = lazy(() => import("@/pages/receipt"));
 const Login        = lazy(() => import("@/pages/login"));
 const NotFound     = lazy(() => import("@/pages/not-found"));
 
@@ -58,6 +60,8 @@ function Router() {
       <Route path="/achievements" component={() => <ProtectedRoute component={Achievements} />} />
       <Route path="/planes"       component={() => <ProtectedRoute component={Pricing} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />
+      <Route path="/materiales"   component={() => <ProtectedRoute component={Resources} />} />
+      <Route path="/comprobante"  component={() => <ProtectedRoute component={Receipt} />} />
       <Route component={() => <Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
     </Switch>
   );

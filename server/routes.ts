@@ -8,7 +8,8 @@ import { registerAuthRoutes } from "./replit_integrations/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { openai } from "./replit_integrations/chat/client";
 import { db } from "./db";
-import { levels, lessons, achievements } from "@shared/schema";
+import { levels, lessons, achievements, subscriptionPlans } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import {
   wompiEnabled,
   generateReference,
@@ -209,6 +210,124 @@ export async function registerRoutes(
     }
   });
 
+  // ─── YouTube API ──────────────────────────────────────────────
+  app.get("/api/youtube/search", isAuthenticated, async (req, res) => {
+    const { q, max } = req.query;
+    const { searchYouTubeVideos, youtubeEnabled } = await import("./youtube");
+    if (!youtubeEnabled()) return res.status(503).json({ message: "YouTube API key not configured (YOUTUBE_API_KEY)" });
+    try {
+      const videos = await searchYouTubeVideos(String(q || "english learning"), Number(max || 8));
+      res.json({ videos });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/youtube/embed/:videoId", (req, res) => {
+    const { buildYouTubeEmbedUrl } = require("./youtube");
+    res.json({ embedUrl: buildYouTubeEmbedUrl(req.params.videoId) });
+  });
+
+  app.get("/api/youtube/status", isAuthenticated, (_req, res) => {
+    const { youtubeEnabled } = require("./youtube");
+    res.json({ enabled: youtubeEnabled(), hasKey: !!process.env.YOUTUBE_API_KEY });
+  });
+
+  // ─── Google Drive API ─────────────────────────────────────────
+  app.get("/api/drive/status", isAuthenticated, (_req, res) => {
+    const { driveEnabled } = require("./gdrive");
+    res.json({
+      enabled: driveEnabled(),
+      hasOAuth: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    });
+  });
+
+  app.post("/api/drive/embed", isAuthenticated, (req, res) => {
+    const { buildEmbedUrl, isValidDriveUrl, getDriveResourceType, extractDriveFileId } = require("./gdrive");
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ message: "url required" });
+    res.json({
+      embedUrl: buildEmbedUrl(url),
+      isValid: isValidDriveUrl(url),
+      resourceType: getDriveResourceType(url),
+      fileId: extractDriveFileId(url),
+    });
+  });
+
+  // ─── Course Resources ─────────────────────────────────────────
+  app.get("/api/resources", async (req, res) => {
+    const levelId = req.query.levelId ? Number(req.query.levelId) : undefined;
+    const resources = await storage.getCourseResources(levelId);
+    res.json({ resources });
+  });
+
+  app.post("/api/resources", isAuthenticated, requireRole("admin"), async (req, res) => {
+    const schema = z.object({
+      title: z.string().min(1),
+      description: z.string().optional(),
+      resourceType: z.enum(["document", "video", "youtube", "drive", "pdf"]).default("document"),
+      url: z.string().url(),
+      driveFileId: z.string().optional(),
+      youtubeVideoId: z.string().optional(),
+      levelId: z.number().int().optional(),
+      isPublic: z.boolean().default(true),
+      sortOrder: z.number().int().default(0),
+    });
+    const data = schema.parse(req.body);
+    const resource = await storage.createCourseResource(data as any);
+    res.status(201).json(resource);
+  });
+
+  app.delete("/api/resources/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    await storage.deleteCourseResource(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // ─── Payment Receipts (Banco Popular manual transfer) ─────────
+  app.post("/api/receipts", isAuthenticated, async (req: any, res) => {
+    const schema = z.object({
+      planId: z.number().int(),
+      amountCOP: z.number().int().min(1000),
+      senderName: z.string().min(1),
+      senderAccount: z.string().optional(),
+      driveReceiptUrl: z.string().url().optional().or(z.literal("")),
+      bankName: z.string().default("Banco Popular"),
+    });
+    const data = schema.parse(req.body);
+    const userId = req.user.claims.sub;
+    const receipt = await storage.createPaymentReceipt({ ...data, userId, driveReceiptUrl: data.driveReceiptUrl || undefined });
+    res.status(201).json(receipt);
+  });
+
+  app.get("/api/receipts/me", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const receipts = await storage.getUserReceipts(userId);
+    res.json({ receipts });
+  });
+
+  app.get("/api/admin/receipts", isAuthenticated, requireRole("admin"), async (_req, res) => {
+    const receipts = await storage.getPendingReceipts();
+    res.json({ receipts });
+  });
+
+  app.patch("/api/admin/receipts/:id", isAuthenticated, requireRole("admin"), async (req, res) => {
+    const { status, adminNotes } = z.object({
+      status: z.enum(["pending", "verified", "rejected"]),
+      adminNotes: z.string().optional(),
+    }).parse(req.body);
+    const receipt = await storage.updateReceiptStatus(Number(req.params.id), status, adminNotes);
+    // If verified, activate subscription
+    if (status === "verified") {
+      const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, receipt.planId));
+      if (plan) {
+        const ref = `manual-${receipt.id}-${Date.now()}`;
+        const sub = await storage.createPendingSubscription(receipt.userId, receipt.planId, ref);
+        await storage.updateSubscriptionStatus(ref, "approved", `receipt-${receipt.id}`);
+      }
+    }
+    res.json(receipt);
+  });
+
   // ─── Admin Routes ─────────────────────────────────────────────
   app.get("/api/admin/stats", isAuthenticated, requireRole("admin"), async (_req, res) => {
     const stats = await storage.getAdminStats();
@@ -262,6 +381,8 @@ export async function registerRoutes(
       openai: !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY),
       wompi: !!(process.env.WOMPI_PUBLIC_KEY && process.env.WOMPI_PRIVATE_KEY),
       googleOAuth: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+      youtube: !!(process.env.YOUTUBE_API_KEY),
+      googleDrive: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     });
   });
 

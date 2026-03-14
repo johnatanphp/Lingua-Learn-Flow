@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   BookOpen, LayoutDashboard, CalendarDays,
   Sparkles, Medal, LogOut, Zap, Flame,
-  GraduationCap, Users, Shield, Globe, CreditCard,
+  GraduationCap, Users, Shield, Globe, CreditCard, Youtube,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/",             label: "Inicio",        icon: LayoutDashboard },
   { href: "/path",         label: "Mi camino",     icon: BookOpen },
   { href: "/classes",      label: "Clases",        icon: CalendarDays },
+  { href: "/materiales",   label: "Materiales",    icon: Youtube },
   { href: "/ai-practice",  label: "IA",            icon: Sparkles },
   { href: "/achievements", label: "Logros",        icon: Medal },
   { href: "/planes",       label: "Planes",        icon: CreditCard },

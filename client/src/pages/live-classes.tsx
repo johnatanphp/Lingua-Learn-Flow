@@ -1,11 +1,11 @@
 import { Layout } from "@/components/layout";
 import { useLiveClasses, useRegisterClass } from "@/hooks/use-classes";
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar, Video, Clock, Users, CheckCircle, Link as LinkIcon, GraduationCap } from "lucide-react";
+import { Calendar, Video, Clock, Users, CheckCircle, Link as LinkIcon, GraduationCap, Youtube, X, FileText } from "lucide-react";
 import { GamifiedButton } from "@/components/gamified-button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -30,6 +30,9 @@ const LEVEL_COLORS: Record<string, string> = {
 interface ClassWithDetails extends LiveClass {
   instructorName?: string;
   registrationCount?: number;
+  youtubeStreamId?: string | null;
+  youtubeChannelId?: string | null;
+  driveResourceUrl?: string | null;
 }
 
 interface ClassesResponse {
@@ -41,6 +44,7 @@ export default function LiveClasses() {
   const { mutate: register, isPending, variables: registeredId } = useRegisterClass();
   const { toast } = useToast();
   const [registered, setRegistered] = useState<Set<number>>(new Set());
+  const [activeYouTube, setActiveYouTube] = useState<{ id: string; title: string; isChannel?: boolean } | null>(null);
 
   const handleRegister = (id: number) => {
     register(id, {
@@ -63,6 +67,37 @@ export default function LiveClasses() {
 
   return (
     <Layout>
+      {/* YouTube Player Modal */}
+      {activeYouTube && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setActiveYouTube(null)}>
+          <div className="bg-black rounded-3xl overflow-hidden w-full max-w-4xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 bg-black/80">
+              <div className="flex items-center gap-2 text-white">
+                <Youtube className="w-5 h-5 text-red-500" />
+                <span className="font-bold text-sm">{activeYouTube.title}</span>
+                <Badge className="bg-red-600 text-white text-[10px] border-0">EN VIVO</Badge>
+              </div>
+              <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => setActiveYouTube(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="relative" style={{ paddingBottom: "56.25%" }}>
+              <iframe
+                src={
+                  activeYouTube.isChannel
+                    ? `https://www.youtube.com/embed/live_stream?channel=${activeYouTube.id}&rel=0&modestbranding=1&autoplay=1`
+                    : `https://www.youtube.com/embed/${activeYouTube.id}?rel=0&modestbranding=1&autoplay=1`
+                }
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                title={activeYouTube.title}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="mb-8">
         <h1 className="text-3xl md:text-4xl font-display font-black mb-2 flex items-center gap-3">
@@ -149,10 +184,22 @@ export default function LiveClasses() {
 
                   {isRegistered ? (
                     <div className="space-y-2">
-                      <div className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 rounded-2xl py-3 font-bold text-sm">
-                        <CheckCircle className="w-4 h-4" />
-                        ¡Inscrito!
+                      <div className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 rounded-2xl py-2.5 font-bold text-sm">
+                        <CheckCircle className="w-4 h-4" /> ¡Inscrito!
                       </div>
+                      {(cls.youtubeStreamId || cls.youtubeChannelId) && (
+                        <button
+                          data-testid={`btn-watch-youtube-${cls.id}`}
+                          onClick={() => setActiveYouTube({
+                            id: (cls.youtubeStreamId || cls.youtubeChannelId)!,
+                            title: cls.title,
+                            isChannel: !cls.youtubeStreamId && !!cls.youtubeChannelId,
+                          })}
+                          className="w-full flex items-center justify-center gap-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 py-2.5 rounded-2xl transition-colors"
+                        >
+                          <Youtube className="w-4 h-4" /> Ver clase en YouTube
+                        </button>
+                      )}
                       {cls.meetingUrl && (
                         <a
                           href={cls.meetingUrl}
@@ -161,8 +208,18 @@ export default function LiveClasses() {
                           data-testid={`link-meeting-${cls.id}`}
                           className="flex items-center justify-center gap-2 text-sm font-semibold text-primary hover:underline py-2 bg-primary/5 rounded-2xl border border-primary/20 transition-colors hover:bg-primary/10"
                         >
-                          <LinkIcon className="w-4 h-4" />
-                          Unirse a la clase
+                          <LinkIcon className="w-4 h-4" /> Unirse (Zoom/Meet)
+                        </a>
+                      )}
+                      {cls.driveResourceUrl && (
+                        <a
+                          href={cls.driveResourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-testid={`link-drive-${cls.id}`}
+                          className="flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:underline py-2 bg-blue-50 rounded-2xl border border-blue-200 transition-colors hover:bg-blue-100"
+                        >
+                          <FileText className="w-4 h-4" /> Material de clase (Drive)
                         </a>
                       )}
                     </div>

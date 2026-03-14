@@ -11,8 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Users, CalendarDays, CreditCard, Wifi, WifiOff, Trash2,
-  Plus, Shield, BookOpen, Star, Loader2, CheckCircle2, AlertCircle,
+  Users, CalendarDays, CreditCard, Wifi, Trash2,
+  Plus, Shield, BookOpen, Loader2, CheckCircle2, AlertCircle,
+  Youtube, FileText, ExternalLink, Check, X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -52,6 +53,24 @@ interface ApiStatus {
   wompi: boolean;
   database: boolean;
   googleOAuth: boolean;
+  youtube: boolean;
+  googleDrive: boolean;
+}
+
+interface AdminReceipt {
+  id: number;
+  userId: string;
+  planId: number;
+  planName: string;
+  amountCOP: number;
+  bankName: string;
+  senderName: string;
+  senderAccount: string | null;
+  driveReceiptUrl: string | null;
+  status: string;
+  adminNotes: string | null;
+  submittedAt: string;
+  user: { id: string; email: string | null; firstName: string | null };
 }
 
 export default function Admin() {
@@ -68,7 +87,11 @@ export default function Admin() {
     maxStudents: 20,
     durationMinutes: 45,
     meetingUrl: "",
+    youtubeStreamId: "",
+    youtubeChannelId: "",
+    driveResourceUrl: "",
   });
+  const [activeTab, setActiveTab] = useState<"clases" | "usuarios" | "comprobantes">("clases");
   const [showCreateClass, setShowCreateClass] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
@@ -89,6 +112,24 @@ export default function Admin() {
   const { data: apiStatus } = useQuery<ApiStatus>({
     queryKey: ["/api/admin/api-status"],
     enabled: user?.role === "admin",
+  });
+
+  const { data: receiptsData, isLoading: receiptsLoading } = useQuery<{ receipts: AdminReceipt[] }>({
+    queryKey: ["/api/admin/receipts"],
+    enabled: user?.role === "admin",
+  });
+
+  const reviewReceiptMutation = useMutation({
+    mutationFn: async ({ id, status, adminNotes }: { id: number; status: string; adminNotes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/receipts/${id}`, { status, adminNotes });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/receipts"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Comprobante actualizado" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const changeRoleMutation = useMutation({
@@ -227,23 +268,25 @@ export default function Admin() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
                 { label: "Base de datos", key: "database" },
-                { label: "OpenAI", key: "openai" },
+                { label: "OpenAI IA", key: "openai" },
                 { label: "Wompi Pagos", key: "wompi" },
                 { label: "Google OAuth", key: "googleOAuth" },
+                { label: "YouTube API", key: "youtube" },
+                { label: "Google Drive", key: "googleDrive" },
               ].map(({ label, key }) => {
                 const active = apiStatus?.[key as keyof ApiStatus];
                 return (
-                  <div key={key} data-testid={`api-status-${key}`} className={`flex items-center gap-2 p-3 rounded-xl border ${active ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                  <div key={key} data-testid={`api-status-${key}`} className={`flex items-center gap-2 p-3 rounded-xl border ${active ? "bg-emerald-50 border-emerald-200" : "bg-muted border-border"}`}>
                     {active
                       ? <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      : <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                      : <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
                     <div>
                       <div className="text-xs font-bold text-foreground">{label}</div>
-                      <div className={`text-[10px] font-medium ${active ? "text-emerald-600" : "text-red-500"}`}>
-                        {active ? "Conectado" : "No configurado"}
+                      <div className={`text-[10px] font-medium ${active ? "text-emerald-600" : "text-muted-foreground"}`}>
+                        {active ? "Activo" : "Sin configurar"}
                       </div>
                     </div>
                   </div>
@@ -252,7 +295,12 @@ export default function Admin() {
             </div>
             {!apiStatus?.wompi && (
               <p className="mt-3 text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                💳 Para activar los pagos Wompi (PSE, Banco Popular, tarjetas), agrega las llaves en la sección de secretos: WOMPI_PUBLIC_KEY, WOMPI_PRIVATE_KEY, WOMPI_INTEGRITY_KEY, WOMPI_EVENTS_KEY.
+                Para activar pagos Wompi (PSE + tarjetas), agrega: WOMPI_PUBLIC_KEY, WOMPI_PRIVATE_KEY, WOMPI_INTEGRITY_KEY, WOMPI_EVENTS_KEY.
+              </p>
+            )}
+            {!apiStatus?.youtube && (
+              <p className="mt-2 text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                Para búsqueda de videos de YouTube, agrega el secreto YOUTUBE_API_KEY. Los embeds de YouTube funcionan sin llave.
               </p>
             )}
           </CardContent>
@@ -300,6 +348,18 @@ export default function Admin() {
                   <div className="space-y-1">
                     <Label htmlFor="class-url" className="text-xs">Enlace de reunión (Zoom/Meet)</Label>
                     <Input id="class-url" data-testid="input-class-url" placeholder="https://meet.google.com/..." value={newClass.meetingUrl} onChange={e => setNewClass(p => ({ ...p, meetingUrl: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="class-yt-stream" className="text-xs flex items-center gap-1"><Youtube className="w-3 h-3 text-red-500" /> YouTube Stream ID (video)</Label>
+                    <Input id="class-yt-stream" data-testid="input-class-yt-stream" placeholder="dQw4w9WgXcQ" value={newClass.youtubeStreamId} onChange={e => setNewClass(p => ({ ...p, youtubeStreamId: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="class-yt-channel" className="text-xs flex items-center gap-1"><Youtube className="w-3 h-3 text-red-500" /> YouTube Channel ID (live)</Label>
+                    <Input id="class-yt-channel" data-testid="input-class-yt-channel" placeholder="UCxxxxxx" value={newClass.youtubeChannelId} onChange={e => setNewClass(p => ({ ...p, youtubeChannelId: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="class-drive" className="text-xs flex items-center gap-1"><FileText className="w-3 h-3 text-blue-500" /> Enlace Google Drive (material)</Label>
+                    <Input id="class-drive" data-testid="input-class-drive" placeholder="https://drive.google.com/..." value={newClass.driveResourceUrl} onChange={e => setNewClass(p => ({ ...p, driveResourceUrl: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="class-max" className="text-xs">Máx. estudiantes</Label>
@@ -390,6 +450,81 @@ export default function Admin() {
                     >
                       {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                     </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Payment Receipts Management */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-primary" /> Comprobantes de Transferencia
+              {receiptsData?.receipts.filter(r => r.status === "pending").length ? (
+                <span className="ml-auto bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                  {receiptsData.receipts.filter(r => r.status === "pending").length} pendientes
+                </span>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {receiptsLoading ? (
+              <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}</div>
+            ) : receiptsData?.receipts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay comprobantes enviados aún.</p>
+            ) : (
+              <div className="space-y-2">
+                {receiptsData?.receipts.map(r => (
+                  <div key={r.id} data-testid={`receipt-${r.id}`} className="p-3 rounded-xl border border-border space-y-2">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-semibold text-sm">{r.senderName}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            r.status === "verified" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                            r.status === "rejected" ? "bg-red-50 text-red-700 border-red-200" :
+                            "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}>
+                            {r.status === "verified" ? "Aprobado" : r.status === "rejected" ? "Rechazado" : "Pendiente"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {r.user.email} · Plan: {r.planName} ·{" "}
+                          {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(r.amountCOP / 100)}
+                        </div>
+                        {r.senderAccount && <div className="text-xs text-muted-foreground">Cta origen: {r.senderAccount}</div>}
+                        {r.driveReceiptUrl && (
+                          <a href={r.driveReceiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline mt-0.5">
+                            <ExternalLink className="w-3 h-3" /> Ver comprobante Drive
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {r.status === "pending" && (
+                      <div className="flex gap-2">
+                        <Button
+                          data-testid={`btn-approve-receipt-${r.id}`}
+                          size="sm"
+                          className="flex-1 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs"
+                          disabled={reviewReceiptMutation.isPending}
+                          onClick={() => reviewReceiptMutation.mutate({ id: r.id, status: "verified", adminNotes: "Transferencia verificada por admin." })}
+                        >
+                          <Check className="w-3.5 h-3.5" /> Aprobar
+                        </Button>
+                        <Button
+                          data-testid={`btn-reject-receipt-${r.id}`}
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 gap-1 border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs"
+                          disabled={reviewReceiptMutation.isPending}
+                          onClick={() => reviewReceiptMutation.mutate({ id: r.id, status: "rejected", adminNotes: "No se pudo verificar la transferencia." })}
+                        >
+                          <X className="w-3.5 h-3.5" /> Rechazar
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

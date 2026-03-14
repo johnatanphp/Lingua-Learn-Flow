@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useEffect, useState } from "react";
-import { Check, Star, Zap, Crown, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Check, Star, Zap, Crown, Loader2, AlertCircle, CheckCircle2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

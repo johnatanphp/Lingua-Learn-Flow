@@ -59,6 +59,9 @@ export const liveClasses = pgTable("live_classes", {
   scheduledAt: timestamp("scheduled_at").notNull(),
   instructorId: varchar("instructor_id").notNull().references(() => users.id),
   meetingUrl: text("meeting_url"),
+  youtubeStreamId: varchar("youtube_stream_id", { length: 64 }),
+  youtubeChannelId: varchar("youtube_channel_id", { length: 64 }),
+  driveResourceUrl: text("drive_resource_url"),
   maxStudents: integer("max_students").notNull().default(20),
   durationMinutes: integer("duration_minutes").notNull().default(45),
   level: varchar("level", { length: 30 }).notNull().default("todos"),
@@ -97,12 +100,45 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ─── Course Resources (Google Drive + YouTube) ───────────────────
+export const courseResources = pgTable("course_resources", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  resourceType: varchar("resource_type", { length: 30 }).notNull().default("document"),
+  url: text("url").notNull(),
+  driveFileId: varchar("drive_file_id", { length: 100 }),
+  youtubeVideoId: varchar("youtube_video_id", { length: 30 }),
+  levelId: integer("level_id").references(() => levels.id),
+  isPublic: boolean("is_public").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ─── Payment Receipts (Banco Popular manual transfers) ────────────
+export const paymentReceipts = pgTable("payment_receipts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  planId: integer("plan_id").notNull().references(() => subscriptionPlans.id),
+  amountCOP: integer("amount_cop").notNull(),
+  bankName: varchar("bank_name", { length: 100 }).notNull().default("Banco Popular"),
+  senderName: text("sender_name").notNull(),
+  senderAccount: varchar("sender_account", { length: 50 }),
+  driveReceiptUrl: text("drive_receipt_url"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  adminNotes: text("admin_notes"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
 // Schemas
 export const insertLevelSchema = createInsertSchema(levels).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLiveClassSchema = createInsertSchema(liveClasses).omit({ id: true });
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true });
 export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({ id: true });
+export const insertCourseResourceSchema = createInsertSchema(courseResources).omit({ id: true, createdAt: true });
+export const insertPaymentReceiptSchema = createInsertSchema(paymentReceipts).omit({ id: true, submittedAt: true, reviewedAt: true });
 
 export type Level = typeof levels.$inferSelect;
 export type InsertLevel = z.infer<typeof insertLevelSchema>;
@@ -114,3 +150,5 @@ export type Achievement = typeof achievements.$inferSelect;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type CourseResource = typeof courseResources.$inferSelect;
+export type PaymentReceipt = typeof paymentReceipts.$inferSelect;

@@ -10,6 +10,8 @@ import {
   classRegistrations,
   subscriptionPlans,
   userSubscriptions,
+  courseResources,
+  paymentReceipts,
   type Level,
   type Lesson,
   type UserProgress,
@@ -18,6 +20,8 @@ import {
   type LessonCompletion,
   type SubscriptionPlan,
   type UserSubscription,
+  type CourseResource,
+  type PaymentReceipt,
 } from "@shared/schema";
 import { users, type User } from "@shared/models/auth";
 import { authStorage } from "./replit_integrations/auth/storage";
@@ -51,10 +55,21 @@ export interface IStorage {
   // Admin
   getAdminStats(): Promise<{ totalUsers: number; totalClasses: number; activeSubscriptions: number; totalLevels: number }>;
   getAdminUsers(): Promise<User[]>;
-  getAdminClasses(): Promise<Array<{ id: number; title: string; description: string; scheduledAt: Date; level: string; maxStudents: number; durationMinutes: number; meetingUrl: string | null; instructorName: string; registrationCount: number; }>>;
-  createLiveClass(data: { title: string; description: string; scheduledAt: Date | string; instructorId: string; level: string; maxStudents: number; durationMinutes: number; meetingUrl?: string; }): Promise<LiveClass>;
+  getAdminClasses(): Promise<Array<{ id: number; title: string; description: string; scheduledAt: Date; level: string; maxStudents: number; durationMinutes: number; meetingUrl: string | null; youtubeStreamId: string | null; youtubeChannelId: string | null; driveResourceUrl: string | null; instructorName: string; registrationCount: number; }>>;
+  createLiveClass(data: { title: string; description: string; scheduledAt: Date | string; instructorId: string; level: string; maxStudents: number; durationMinutes: number; meetingUrl?: string; youtubeStreamId?: string; youtubeChannelId?: string; driveResourceUrl?: string; }): Promise<LiveClass>;
   deleteLiveClass(id: number): Promise<void>;
   updateUserRole(userId: string, role: string): Promise<User>;
+
+  // Course Resources
+  getCourseResources(levelId?: number): Promise<CourseResource[]>;
+  createCourseResource(data: Omit<CourseResource, "id" | "createdAt">): Promise<CourseResource>;
+  deleteCourseResource(id: number): Promise<void>;
+
+  // Payment Receipts
+  createPaymentReceipt(data: { userId: string; planId: number; amountCOP: number; senderName: string; senderAccount?: string; driveReceiptUrl?: string; bankName?: string; }): Promise<PaymentReceipt>;
+  getUserReceipts(userId: string): Promise<PaymentReceipt[]>;
+  getPendingReceipts(): Promise<Array<PaymentReceipt & { user: Partial<User>; planName: string }>>;
+  updateReceiptStatus(id: number, status: string, adminNotes?: string): Promise<PaymentReceipt>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -192,7 +207,8 @@ export class DatabaseStorage implements IStorage {
   async getAdminClasses(): Promise<Array<{
     id: number; title: string; description: string; scheduledAt: Date;
     level: string; maxStudents: number; durationMinutes: number;
-    meetingUrl: string | null; instructorName: string; registrationCount: number;
+    meetingUrl: string | null; youtubeStreamId: string | null; youtubeChannelId: string | null;
+    driveResourceUrl: string | null; instructorName: string; registrationCount: number;
   }>> {
     const classes = await db.select().from(liveClasses).orderBy(liveClasses.scheduledAt);
     const result = await Promise.all(classes.map(async (cls) => {
@@ -207,6 +223,9 @@ export class DatabaseStorage implements IStorage {
         maxStudents: cls.maxStudents,
         durationMinutes: cls.durationMinutes,
         meetingUrl: cls.meetingUrl ?? null,
+        youtubeStreamId: cls.youtubeStreamId ?? null,
+        youtubeChannelId: cls.youtubeChannelId ?? null,
+        driveResourceUrl: cls.driveResourceUrl ?? null,
         instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() || instructor.email || "Admin" : "Admin",
         registrationCount: regs.length,
       };
@@ -218,6 +237,7 @@ export class DatabaseStorage implements IStorage {
     title: string; description: string; scheduledAt: Date | string;
     instructorId: string; level: string; maxStudents: number;
     durationMinutes: number; meetingUrl?: string;
+    youtubeStreamId?: string; youtubeChannelId?: string; driveResourceUrl?: string;
   }): Promise<LiveClass> {
     const [cls] = await db.insert(liveClasses).values({
       title: data.title,
@@ -228,8 +248,77 @@ export class DatabaseStorage implements IStorage {
       maxStudents: data.maxStudents,
       durationMinutes: data.durationMinutes,
       meetingUrl: data.meetingUrl || null,
+      youtubeStreamId: data.youtubeStreamId || null,
+      youtubeChannelId: data.youtubeChannelId || null,
+      driveResourceUrl: data.driveResourceUrl || null,
     }).returning();
     return cls;
+  }
+
+  // ── Course Resources ─────────────────────────────────────────────
+  async getCourseResources(levelId?: number): Promise<CourseResource[]> {
+    if (levelId) {
+      return await db.select().from(courseResources)
+        .where(eq(courseResources.levelId, levelId))
+        .orderBy(courseResources.sortOrder, courseResources.createdAt);
+    }
+    return await db.select().from(courseResources).orderBy(courseResources.sortOrder, courseResources.createdAt);
+  }
+
+  async createCourseResource(data: Omit<CourseResource, "id" | "createdAt">): Promise<CourseResource> {
+    const [resource] = await db.insert(courseResources).values(data).returning();
+    return resource;
+  }
+
+  async deleteCourseResource(id: number): Promise<void> {
+    await db.delete(courseResources).where(eq(courseResources.id, id));
+  }
+
+  // ── Payment Receipts ─────────────────────────────────────────────
+  async createPaymentReceipt(data: {
+    userId: string; planId: number; amountCOP: number; senderName: string;
+    senderAccount?: string; driveReceiptUrl?: string; bankName?: string;
+  }): Promise<PaymentReceipt> {
+    const [receipt] = await db.insert(paymentReceipts).values({
+      userId: data.userId,
+      planId: data.planId,
+      amountCOP: data.amountCOP,
+      senderName: data.senderName,
+      senderAccount: data.senderAccount || null,
+      driveReceiptUrl: data.driveReceiptUrl || null,
+      bankName: data.bankName || "Banco Popular",
+      status: "pending",
+    }).returning();
+    return receipt;
+  }
+
+  async getUserReceipts(userId: string): Promise<PaymentReceipt[]> {
+    return await db.select().from(paymentReceipts)
+      .where(eq(paymentReceipts.userId, userId))
+      .orderBy(desc(paymentReceipts.submittedAt));
+  }
+
+  async getPendingReceipts(): Promise<Array<PaymentReceipt & { user: Partial<User>; planName: string }>> {
+    const receipts = await db.select().from(paymentReceipts)
+      .orderBy(desc(paymentReceipts.submittedAt));
+    return await Promise.all(receipts.map(async (r) => {
+      const user = await authStorage.getUser(r.userId);
+      const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, r.planId));
+      return {
+        ...r,
+        user: { id: user?.id, email: user?.email, firstName: user?.firstName, lastName: user?.lastName },
+        planName: plan?.name ?? "Plan desconocido",
+      };
+    }));
+  }
+
+  async updateReceiptStatus(id: number, status: string, adminNotes?: string): Promise<PaymentReceipt> {
+    const [receipt] = await db.update(paymentReceipts).set({
+      status,
+      adminNotes: adminNotes ?? null,
+      reviewedAt: new Date(),
+    }).where(eq(paymentReceipts.id, id)).returning();
+    return receipt;
   }
 
   async deleteLiveClass(id: number): Promise<void> {
