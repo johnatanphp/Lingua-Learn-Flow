@@ -14,6 +14,13 @@ const AiPractice   = lazy(() => import("@/pages/ai-practice"));
 const Achievements = lazy(() => import("@/pages/achievements"));
 const Login        = lazy(() => import("@/pages/login"));
 const NotFound     = lazy(() => import("@/pages/not-found"));
+const Plans        = lazy(() => import("@/pages/plans"));
+const Invoices     = lazy(() => import("@/pages/invoices"));
+const Certificates = lazy(() => import("@/pages/certificates"));
+const Admin        = lazy(() => import("@/pages/admin"));
+const Teacher      = lazy(() => import("@/pages/teacher"));
+const VideoRoom    = lazy(() => import("@/pages/video-room"));
+const Recordings   = lazy(() => import("@/pages/recordings"));
 
 function PageLoader() {
   return (
@@ -26,7 +33,7 @@ function PageLoader() {
   );
 }
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
 
@@ -34,6 +41,11 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (!user) {
     setTimeout(() => navigate("/login"), 0);
+    return null;
+  }
+
+  if (roles && user.role && !roles.includes(user.role)) {
+    setTimeout(() => navigate("/"), 0);
     return null;
   }
 
@@ -48,12 +60,19 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={() => <Suspense fallback={<PageLoader />}><Login /></Suspense>} />
-      <Route path="/"             component={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/path"         component={() => <ProtectedRoute component={LearningPath} />} />
-      <Route path="/lesson/:id"   component={() => <ProtectedRoute component={Lesson} />} />
-      <Route path="/classes"      component={() => <ProtectedRoute component={LiveClasses} />} />
-      <Route path="/ai-practice"  component={() => <ProtectedRoute component={AiPractice} />} />
-      <Route path="/achievements" component={() => <ProtectedRoute component={Achievements} />} />
+      <Route path="/"              component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/path"          component={() => <ProtectedRoute component={LearningPath} />} />
+      <Route path="/lesson/:id"    component={() => <ProtectedRoute component={Lesson} />} />
+      <Route path="/classes"       component={() => <ProtectedRoute component={LiveClasses} />} />
+      <Route path="/ai-practice"   component={() => <ProtectedRoute component={AiPractice} />} />
+      <Route path="/achievements"  component={() => <ProtectedRoute component={Achievements} />} />
+      <Route path="/plans"         component={() => <ProtectedRoute component={Plans} />} />
+      <Route path="/invoices"      component={() => <ProtectedRoute component={Invoices} />} />
+      <Route path="/certificates"  component={() => <ProtectedRoute component={Certificates} />} />
+      <Route path="/recordings"    component={() => <ProtectedRoute component={Recordings} />} />
+      <Route path="/teacher"       component={() => <ProtectedRoute component={Teacher} roles={["teacher","admin"]} />} />
+      <Route path="/admin"         component={() => <ProtectedRoute component={Admin} roles={["admin"]} />} />
+      <Route path="/video-room/:code" component={() => <ProtectedRoute component={VideoRoom} />} />
       <Route component={() => <Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
     </Switch>
   );
