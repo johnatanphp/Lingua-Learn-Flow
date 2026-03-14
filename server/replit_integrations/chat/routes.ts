@@ -2,10 +2,18 @@ import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 import { chatStorage } from "./storage";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+function createOpenAI(): OpenAI {
+  return new OpenAI({
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "placeholder",
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  });
+}
+
+let _openai: OpenAI | null = null;
+function openai(): OpenAI {
+  if (!_openai) _openai = createOpenAI();
+  return _openai;
+}
 
 export function registerChatRoutes(app: Express): void {
   // Get all conversations
@@ -81,7 +89,7 @@ export function registerChatRoutes(app: Express): void {
       res.setHeader("Connection", "keep-alive");
 
       // Stream response from OpenAI
-      const stream = await openai.chat.completions.create({
+      const stream = await openai().chat.completions.create({
         model: "gpt-5.1",
         messages: chatMessages,
         stream: true,
@@ -115,4 +123,3 @@ export function registerChatRoutes(app: Express): void {
     }
   });
 }
-

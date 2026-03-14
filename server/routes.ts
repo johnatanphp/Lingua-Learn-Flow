@@ -5,7 +5,7 @@ import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth";
-import { openai } from "./replit_integrations/chat/client";
+import { getOpenAIClient } from "./replit_integrations/chat/client";
 import { db } from "./db";
 import { levels, lessons, achievements } from "@shared/schema";
 
@@ -143,7 +143,7 @@ export async function registerRoutes(
         "questions": ["Question 1", "Question 2", "Question 3"]
       }`;
 
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-5.1",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" }
