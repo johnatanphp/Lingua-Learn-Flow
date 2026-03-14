@@ -195,6 +195,30 @@ export default function Admin() {
           ))}
         </div>
 
+        {/* Platform Info — Bank Account & Contact */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="border-2 border-emerald-200 bg-emerald-50/50">
+            <CardContent className="p-4 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white flex-shrink-0 text-lg">🏦</div>
+              <div>
+                <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-0.5">Cuenta Banco Popular</p>
+                <p className="font-mono font-black text-xl text-emerald-900 tracking-widest" data-testid="text-bank-account">230560175432</p>
+                <p className="text-xs text-emerald-700 mt-0.5">Cuenta de ahorros · PSE / Transferencia</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-2 border-blue-200 bg-blue-50/50">
+            <CardContent className="p-4 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white flex-shrink-0 text-lg">✉️</div>
+              <div>
+                <p className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-0.5">Correo administrador</p>
+                <p className="font-semibold text-blue-900 text-sm" data-testid="text-admin-email">fundacionstudy@gmail.com</p>
+                <p className="text-xs text-blue-700 mt-0.5">Contacto oficial Speak Fluently</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* API Status */}
         <Card>
           <CardHeader className="pb-3">

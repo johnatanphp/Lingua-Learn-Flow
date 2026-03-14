@@ -167,11 +167,21 @@ export default function Pricing() {
         )}
 
         {/* PSE Info Banner */}
-        <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
-          <div className="text-blue-600 text-xl mt-0.5">🏦</div>
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">Pagos seguros con PSE</p>
-            <p>Acepta pagos desde <strong>Banco Popular</strong>, Bancolombia, Davivienda, BBVA, Nequi, tarjetas de crédito/débito y más — procesado por <strong>Wompi</strong>.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+            <div className="text-blue-600 text-xl mt-0.5">🏦</div>
+            <div className="text-sm text-blue-800">
+              <p className="font-semibold mb-1">Pagos seguros con PSE</p>
+              <p>Acepta pagos desde <strong>Banco Popular</strong>, Bancolombia, Davivienda, BBVA, Nequi, tarjetas de crédito/débito y más — procesado por <strong>Wompi</strong>.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+            <div className="text-emerald-600 text-xl mt-0.5">💳</div>
+            <div className="text-sm text-emerald-800">
+              <p className="font-semibold mb-1">Transferencia directa Banco Popular</p>
+              <p className="font-mono font-bold text-base tracking-widest text-emerald-900">230560175432</p>
+              <p className="mt-1">Cuenta de ahorros · <span className="font-medium">fundacionstudy@gmail.com</span></p>
+            </div>
           </div>
         </div>
 

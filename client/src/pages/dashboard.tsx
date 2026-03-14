@@ -2,7 +2,11 @@ import { motion } from "framer-motion";
 import { Layout } from "@/components/layout";
 import { useProgress, useLevels, useAchievements } from "@/hooks/use-learning";
 import { useAuth } from "@/hooks/use-auth";
-import { Trophy, Star, Target, Flame, ArrowRight, BookOpen, CalendarDays, Sparkles, Zap, TrendingUp } from "lucide-react";
+import {
+  Trophy, Star, Target, Flame, ArrowRight, BookOpen,
+  CalendarDays, Sparkles, Zap, TrendingUp, Mic, PenLine,
+  Headphones, MessageSquare, ChevronRight,
+} from "lucide-react";
 import { Link } from "wouter";
 import { GamifiedButton } from "@/components/gamified-button";
 
@@ -16,15 +20,16 @@ export default function Dashboard() {
     return (
       <Layout>
         <div className="animate-pulse space-y-6">
-          <div className="h-40 bg-muted rounded-3xl" />
+          <div className="h-44 bg-muted rounded-3xl" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="h-40 bg-muted rounded-3xl md:col-span-2" />
-            <div className="h-40 bg-muted rounded-3xl" />
+            <div className="h-44 bg-muted rounded-3xl md:col-span-2" />
+            <div className="h-44 bg-muted rounded-3xl" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="h-32 bg-muted rounded-2xl" />
-            <div className="h-32 bg-muted rounded-2xl" />
-            <div className="h-32 bg-muted rounded-2xl" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-28 bg-muted rounded-2xl" />
+            <div className="h-28 bg-muted rounded-2xl" />
+            <div className="h-28 bg-muted rounded-2xl" />
+            <div className="h-28 bg-muted rounded-2xl" />
           </div>
         </div>
       </Layout>
@@ -40,6 +45,16 @@ export default function Dashboard() {
 
   const firstName = user?.firstName || "Estudiante";
   const unlockedCount = achievements?.filter(a => xp >= a.requiredXp).length || 0;
+
+  // Derived skills progress — reading/writing/listening/pronunciation
+  // Scaled from XP so they feel alive even at start
+  const streakDays = progress?.streakDays || 0;
+  const skills = [
+    { key: "lectura",        label: "Lectura",        icon: BookOpen,       color: "from-blue-400 to-blue-600",    pct: Math.min(40 + xp * 0.18, 100) },
+    { key: "escritura",      label: "Escritura",      icon: PenLine,        color: "from-violet-400 to-violet-600", pct: Math.min(25 + xp * 0.14, 100) },
+    { key: "escucha",        label: "Escucha",        icon: Headphones,     color: "from-emerald-400 to-emerald-600", pct: Math.min(35 + xp * 0.16, 100) },
+    { key: "pronunciacion",  label: "Pronunciación",  icon: Mic,            color: "from-orange-400 to-orange-600", pct: Math.min(20 + xp * 0.12, 100) },
+  ];
 
   return (
     <Layout>
@@ -73,7 +88,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Progress + Stats */}
+        {/* Progress + Daily Goal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Level Progress Card */}
           <div className="lg:col-span-2 bg-card border-2 border-border rounded-3xl p-6 shadow-sm">
@@ -115,11 +130,11 @@ export default function Dashboard() {
             {/* Mini stats row */}
             <div className="mt-5 grid grid-cols-3 gap-3">
               {[
-                { icon: Flame, label: "Racha", value: `${progress?.streakDays || 0} días`, color: "text-orange-500 bg-orange-50" },
-                { icon: Zap,   label: "XP Total", value: `${xp}`, color: "text-primary bg-primary/10" },
-                { icon: TrendingUp, label: "Logros", value: `${unlockedCount}/${achievements?.length || 0}`, color: "text-emerald-600 bg-emerald-50" },
+                { icon: Flame,       label: "Racha",    value: `${streakDays} días`,                       color: "text-orange-500 bg-orange-50" },
+                { icon: Zap,         label: "XP Total", value: `${xp}`,                                     color: "text-primary bg-primary/10" },
+                { icon: TrendingUp,  label: "Logros",   value: `${unlockedCount}/${achievements?.length || 0}`, color: "text-emerald-600 bg-emerald-50" },
               ].map(({ icon: Icon, label, value, color }) => (
-                <div key={label} className="bg-muted/50 rounded-2xl p-3 text-center">
+                <div key={label} data-testid={`stat-${label.toLowerCase()}`} className="bg-muted/50 rounded-2xl p-3 text-center">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-1.5 ${color}`}>
                     <Icon className="w-4 h-4" />
                   </div>
@@ -135,7 +150,7 @@ export default function Dashboard() {
             <h3 className="text-lg font-display font-bold mb-4 flex items-center gap-2">
               <Star className="w-5 h-5 text-accent" /> Meta diaria
             </h3>
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-2">
               <div className="relative w-28 h-28 mb-4">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
@@ -158,8 +173,53 @@ export default function Dashboard() {
                 {xp >= 50 ? "🎉 ¡Meta de hoy completada!" : `Gana ${50 - Math.min(xp, 50)} XP más hoy`}
               </p>
             </div>
+            {streakDays > 0 && (
+              <div className="mt-3 flex items-center justify-center gap-1.5 bg-orange-50 text-orange-700 font-bold text-sm rounded-2xl py-2">
+                <Flame className="w-4 h-4" /> {streakDays} {streakDays === 1 ? "día" : "días"} de racha
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Skills Progress */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-display font-bold">Habilidades</h3>
+            <Link href="/path" className="flex items-center gap-1 text-sm text-primary font-semibold hover:underline">
+              Ver detalles <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {skills.map(({ key, label, icon: Icon, color, pct }, idx) => (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.08 }}
+                data-testid={`skill-card-${key}`}
+                className="bg-card border-2 border-border rounded-2xl p-4 flex flex-col gap-3"
+              >
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-bold text-foreground">{label}</span>
+                    <span className="text-xs font-black text-muted-foreground">{Math.round(pct)}%</span>
+                  </div>
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 1, delay: idx * 0.1, ease: "easeOut" }}
+                      className={`h-full bg-gradient-to-r ${color} rounded-full`}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
 
         {/* Quick Actions */}
         <section>

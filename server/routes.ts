@@ -21,19 +21,37 @@ import {
 import bcrypt from "bcryptjs";
 
 // Seed default admin account
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@speakfluently.co";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "SpeakAdmin2026!";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "fundacionstudy@gmail.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "Marzo2026.";
+const LEGACY_ADMIN_EMAIL = "admin@speakfluently.co";
 
 async function seedAdminAccount() {
   try {
+    // Migrate legacy admin account to new credentials if it exists
+    const legacy = await authStorage.getUserByEmail(LEGACY_ADMIN_EMAIL);
+    if (legacy && legacy.role === "admin") {
+      const { db } = await import("./db");
+      const { users } = await import("@shared/models/auth");
+      const { eq } = await import("drizzle-orm");
+      const newPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+      await db.update(users).set({
+        email: ADMIN_EMAIL,
+        passwordHash: newPasswordHash,
+        firstName: "Fundación",
+        lastName: "Study",
+        updatedAt: new Date(),
+      }).where(eq(users.id, legacy.id));
+      console.log(`[admin] Cuenta admin migrada a: ${ADMIN_EMAIL}`);
+      return;
+    }
     const existing = await authStorage.getUserByEmail(ADMIN_EMAIL);
     if (!existing) {
       const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
       await authStorage.createLocalUser({
         email: ADMIN_EMAIL,
         passwordHash,
-        firstName: "Admin",
-        lastName: "Speak Fluently",
+        firstName: "Fundación",
+        lastName: "Study",
         role: "admin",
       });
       console.log(`[admin] Cuenta admin creada: ${ADMIN_EMAIL}`);
